@@ -28,6 +28,15 @@
 
 #include "bitarray.h"
 
+ #define BITS (sizeof(size_t) * 8)
+ #define MASK(X,Y) (X ^ (X << Y))
+ #define B5 MASK(-1L,32)
+ #define B4 MASK(B5,16)
+ #define B3 MASK(B4,8)
+ #define B2 MASK(B3,4)
+ #define B1 MASK(B2,2)
+ #define B0 MASK(B1,1)
+
 /* Internal representation of the bit array. */
 struct bitarray {
   /* The number of bits represented by this bit array. Need not be divisible by 8. */
@@ -90,8 +99,70 @@ void bitarray_set(bitarray_t *ba, size_t bit_index, bool val) {
       = (ba->buf[bit_index / 8] & ~bitmask(bit_index)) | (val ? bitmask(bit_index) : 0); 
 }
 
+// 1.4793s
+size_t count_set_bits_parallel(size_t a) {
+  // count # of bits
+  a = (a & B0) + ((a >> 1) & B0);
+  a = (a & B1) + ((a >> 2) & B1);
+  a = (a & B2) + ((a >> 4) & B2);
+  a = (a & B3) + ((a >> 8) & B3);
+  a = (a & B4) + ((a >> 16) & B4);
+  a = (a & B5) + ((a >> 32) & B5);
+  return a;
+}
+
+// 8.2151s
+size_t count_set_bits_linear(size_t a) {
+  size_t count = 0;
+  while(a) {
+    a &= a - 1;
+    ++count;
+  }
+  return count;
+}
+
+size_t detect_bit_flips(size_t a, size_t carry) {
+  a = ((a << 1) | carry) ^ a;
+  return a;
+}
+
+size_t count_flips(bitarray_t *ba, size_t bit_off, size_t bit_len) {
+  size_t end_off = bit_off + bit_len,
+    startIndex = bit_off / BITS,
+    endIndex = end_off / BITS,
+    startMask = (size_t)-1L << (bit_off % BITS),
+    endMask = (size_t)-1L >> (BITS - (end_off % BITS)),
+    count = 0L;
+
+  size_t *buf = (size_t*)ba->buf;
+
+  //get masked value
+  size_t val = buf[startIndex] & startMask;
+  //initialize carry bit
+  size_t carry = (val >> (bit_off % BITS)) & 1L;
+
+  size_t i = startIndex;
+  while(i < endIndex) {
+    size_t flipped = detect_bit_flips(val, carry);
+    count += count_set_bits_linear(flipped);
+
+    carry = val >> (BITS - 1);
+    val = buf[++i];
+  }
+  size_t flipped = detect_bit_flips(val, carry);
+  flipped = flipped & endMask;
+  count += count_set_bits_linear(flipped);
+
+  return count;
+}
+
 size_t bitarray_count_flips(bitarray_t *ba, size_t bit_off, size_t bit_len) {
+  return count_flips(ba, bit_off, bit_len);
+}
+
+size_t bitarray_count_flips_harvey(bitarray_t *ba, size_t bit_off, size_t bit_len) {
   assert(bit_off + bit_len <= ba->bit_sz);
+
   size_t i, ret = 0;
   /* Go from the first bit in the substring to the second to last one. For each bit, count another
   transition if the bit is different from the next one. Note: do "i + 1 < bit_off + bit_len" instead

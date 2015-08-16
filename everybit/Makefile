@@ -85,7 +85,7 @@ all:   $(PRODUCT) $(PRODUCT_HARVEY)
 
 # This special "target" will remove the binary and all intermediate files.
 clean:
-	rm -f $(OBJ) $(OBJ_HARVEY) $(PRODUCT) $(PRODUCT_HARVEY) .buildmode
+	rm -f $(OBJ) $(OBJ_HARVEY) $(PRODUCT) $(PRODUCT_HARVEY) .buildmode out.txt
 	(cd betatests && $(MAKE) clean)
 
 test: $(PRODUCT)

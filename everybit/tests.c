@@ -130,7 +130,7 @@ static void testutil_expect_internal(const char *bitstr, size_t flipcount,
     bitarray_fprint(stdout, test_ba);
     fprintf(stdout, " expect bits=%s flipcount=%llu\n",
             bitstr, (unsigned long long) flipcount);
-    TEST_FAIL(func_name, "incorrect %s", bad);
+    TEST_FAIL("incorrect %s", bad);
   } else {
     TEST_PASS_WITH_NAME(func_name, line);
   }
@@ -193,14 +193,17 @@ double longrunning_flipcount(void) {
   size_t bit_sz = 128 * 1024 * 1024 * 8 + 531;
   testutil_newrand(bit_sz, 0);
   clockmark_t time1 = ktiming_getmark();
-  for (int i = 0; i < 20; i++)
+  for (int i = 0; i < 20; i++) 
     bitarray_count_flips(test_ba, 0, bit_sz);
   clockmark_t time2 = ktiming_getmark();
   return ktiming_diff_usec(&time1, &time2) / 1000000000.0;
 }
 
 /* ----------- Actual test methods go here ----------- */
-
+static void test_flips(void) {
+  testutil_frmstr("00101101");
+  testutil_expect_flips(0, 8, 5);
+}
 static void test_headerexamples(void) {
   /* Verify the examples given in bitarray.h. */
   testutil_frmstr("10010110");
@@ -238,6 +241,7 @@ static void test_moreflips(void) {
 }
 
 test_case_t test_cases[] = {
+  test_flips,
   test_headerexamples,
   test_8bit,
   test_moreflips,
